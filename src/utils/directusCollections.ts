@@ -1,5 +1,5 @@
 // Utilidad para listar las colecciones de Directus
-const API_URL = import.meta.env.VITE_DIRECTUS_URL;
+const API_URL = import.meta.env.PROD ? '/api/directus' : import.meta.env.VITE_DIRECTUS_URL;
 const API_TOKEN = import.meta.env.VITE_DIRECTUS_TOKEN;
 
 export async function getDirectusCollections() {

@@ -4,66 +4,189 @@ import { createDirectus, rest, authentication, createItem, readItems, updateItem
 const DIRECTUS_URL = 'https://admin-api-directus.dqyvuv.easypanel.host';
 const DIRECTUS_TOKEN = 'mcp_414xdh4vq47mcao0jg2';
 
-// Tipos base para las tablas
+// Tipos base para las tablas - ACTUALIZADOS según estructura real
 export interface DirectusBaseItem {
-  id?: number;
-  date_created?: string;
-  date_updated?: string;
+  id?: string | number;
+  created_at?: string;
+  updated_at?: string;
 }
 
-// Interfaces para las tablas del sistema
+// Interfaces actualizadas según la estructura real de la BD
 export interface NewCustomer extends DirectusBaseItem {
-  name: string;
-  email: string;
+  id?: number;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
   phone?: string;
   address?: string;
-  subscription_status?: 'active' | 'inactive' | 'paused' | 'cancelled';
-  stripe_customer_id?: string;
-  shopify_customer_id?: string;
-}
-
-export interface Subscription extends DirectusBaseItem {
-  customer_id: number;
-  plan_type: 'basic' | 'premium' | 'elite';
-  status: 'active' | 'inactive' | 'paused' | 'cancelled';
-  start_date: string;
-  end_date?: string;
-  stripe_subscription_id?: string;
-  monthly_price: number;
-  included_cleanings: number;
-  included_inspections: number;
-  has_protection: boolean;
-  has_trade_in: boolean;
-}
-
-export interface Evaluation extends DirectusBaseItem {
-  customer_id: number;
-  mattress_brand: string;
-  mattress_model?: string;
-  purchase_date?: string;
-  condition: 'excellent' | 'good' | 'fair' | 'poor';
-  estimated_value: number;
-  credit_amount: number;
-  status: 'pending' | 'approved' | 'rejected' | 'redeemed';
-  evaluation_date: string;
-  expiry_date: string;
-  coupon_code?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  country?: string;
+  type?: string;
+  vip?: boolean;
+  credit_limit?: number;
   notes?: string;
 }
 
-// Schema de Directus
+export interface Subscription extends DirectusBaseItem {
+  id?: string;
+  customer_id?: string;
+  plan: string;
+  status: string;
+  pricing: {
+    amount?: number;
+    currency?: string;
+    interval?: string;
+  };
+  billing: {
+    next_payment?: string;
+    last_payment?: string;
+    method?: string;
+  };
+  services?: {
+    cleanings?: number;
+    inspections?: number;
+    protection?: boolean;
+    trade_in?: boolean;
+  };
+  credits?: {
+    cleanings_used?: number;
+    inspections_used?: number;
+  };
+  start_date: string;
+  cancelled_at?: string;
+  paused_at?: string;
+  cancel_reason?: string;
+  sold_by?: string;
+}
+
+export interface Evaluation extends DirectusBaseItem {
+  id?: string;
+  customer_id: string;
+  mattress: {
+    brand?: string;
+    model?: string;
+    age?: number;
+    condition?: string;
+    size?: string;
+  };
+  photos?: any;
+  ai_evaluation?: any;
+  credit_approved?: number;
+  status: string;
+  employee_id?: string;
+  store_id?: string;
+  coupon_code?: string;
+  shopify_price_rule_id?: string;
+  shopify_discount_code_id?: string;
+  customer_info?: any;
+  expires_at?: string;
+  redeemed_at?: string;
+}
+
+export interface StripeConfig extends DirectusBaseItem {
+  id?: string;
+  publishable_key?: string;
+  secret_key?: string;
+  webhook_secret?: string;
+  active?: boolean;
+}
+
+export interface StripePaymentLink extends DirectusBaseItem {
+  id?: string;
+  stripe_payment_link_id?: string;
+  customer_id?: string;
+  customer_email?: string;
+  product_name: string;
+  description?: string;
+  amount: number;
+  currency?: string;
+  status?: string;
+  type?: string;
+  url?: string;
+  metadata?: any;
+  settings?: any;
+  created_by?: string;
+  expires_at?: string;
+  completed_at?: string;
+}
+
+export interface StripeSubscription extends DirectusBaseItem {
+  id?: string;
+  customer_id?: string;
+  stripe_subscription_id: string;
+  stripe_customer_id: string;
+  status: string;
+  current_period_start?: string;
+  current_period_end?: string;
+  cancel_at_period_end?: boolean;
+  canceled_at?: string;
+  plan_id?: string;
+  plan_name?: string;
+  amount?: number;
+  currency?: string;
+  interval?: string;
+  metadata?: any;
+}
+
+export interface ShopifySettings extends DirectusBaseItem {
+  id?: string;
+  shop_domain?: string;
+  api_key?: string;
+  api_secret?: string;
+  access_token?: string;
+  webhook_secret?: string;
+  active?: boolean;
+  last_sync?: string;
+}
+
+export interface ShopifyProduct extends DirectusBaseItem {
+  id?: string;
+  shopify_product_id: string;
+  title: string;
+  handle?: string;
+  product_type?: string;
+  vendor?: string;
+  tags?: string;
+  status?: string;
+  variants?: any;
+  images?: any;
+  price?: number;
+  compare_at_price?: number;
+  inventory_quantity?: number;
+}
+
+export interface ShopifyCoupon extends DirectusBaseItem {
+  id?: string;
+  shopify_price_rule_id?: string;
+  shopify_discount_code_id?: string;
+  code: string;
+  value: number;
+  value_type: string;
+  usage_count?: number;
+  usage_limit?: number;
+  starts_at?: string;
+  ends_at?: string;
+  active?: boolean;
+  customer_id?: string;
+  evaluation_id?: string;
+  created_for?: string;
+}
+
+// Schema de Directus actualizado
 type DirectusSchema = {
   new_customers: NewCustomer[];
   subscriptions: Subscription[];
   evaluations: Evaluation[];
-  stripe_config: any[];
-  stripe_payment_links: any[];
-  stripe_subscriptions: any[];
+  stripe_config: StripeConfig[];
+  stripe_payment_links: StripePaymentLink[];
+  stripe_subscriptions: StripeSubscription[];
   stripe_webhooks: any[];
-  shopify_settings: any[];
-  shopify_products: any[];
+  shopify_settings: ShopifySettings[];
+  shopify_products: ShopifyProduct[];
   shopify_customers: any[];
-  shopify_coupons: any[];
+  shopify_coupons: ShopifyCoupon[];
   sync_history: any[];
   entity_mappings: any[];
 };
@@ -81,7 +204,7 @@ export class DirectusService {
       const customers = await directus.request(
         readItems('new_customers', {
           filter,
-          sort: ['-date_created'],
+          sort: ['-created_at'],
           limit: -1
         })
       );
@@ -137,7 +260,7 @@ export class DirectusService {
       const subscriptions = await directus.request(
         readItems('subscriptions', {
           filter,
-          sort: ['-date_created'],
+          sort: ['-created_at'],
           limit: -1
         })
       );
@@ -148,7 +271,7 @@ export class DirectusService {
     }
   }
 
-  static async getSubscriptionById(id: number) {
+  static async getSubscriptionById(id: string) {
     try {
       const subscriptions = await directus.request(
         readItems('subscriptions', {
@@ -165,6 +288,11 @@ export class DirectusService {
 
   static async createSubscription(data: Partial<Subscription>) {
     try {
+      // Generar ID único si no existe
+      if (!data.id) {
+        data.id = `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      }
+      
       const subscription = await directus.request(
         createItem('subscriptions', data)
       );
@@ -175,7 +303,7 @@ export class DirectusService {
     }
   }
 
-  static async updateSubscription(id: number, data: Partial<Subscription>) {
+  static async updateSubscription(id: string, data: Partial<Subscription>) {
     try {
       const subscription = await directus.request(
         updateItem('subscriptions', id, data)
@@ -193,7 +321,7 @@ export class DirectusService {
       const evaluations = await directus.request(
         readItems('evaluations', {
           filter,
-          sort: ['-date_created'],
+          sort: ['-created_at'],
           limit: -1
         })
       );
@@ -206,6 +334,11 @@ export class DirectusService {
 
   static async createEvaluation(data: Partial<Evaluation>) {
     try {
+      // Generar ID único si no existe
+      if (!data.id) {
+        data.id = `eval_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      }
+      
       const evaluation = await directus.request(
         createItem('evaluations', data)
       );
@@ -216,7 +349,7 @@ export class DirectusService {
     }
   }
 
-  static async updateEvaluation(id: number, data: Partial<Evaluation>) {
+  static async updateEvaluation(id: string, data: Partial<Evaluation>) {
     try {
       const evaluation = await directus.request(
         updateItem('evaluations', id, data)
@@ -234,7 +367,7 @@ export class DirectusService {
       const items = await directus.request(
         readItems(collection, {
           filter,
-          sort: ['-date_created'],
+          sort: ['-created_at'],
           limit: -1
         })
       );
@@ -257,7 +390,7 @@ export class DirectusService {
     }
   }
 
-  static async updateItem<T>(collection: keyof DirectusSchema, id: number, data: any) {
+  static async updateItem<T>(collection: keyof DirectusSchema, id: string | number, data: any) {
     try {
       const item = await directus.request(
         updateItem(collection, id, data)
@@ -269,7 +402,7 @@ export class DirectusService {
     }
   }
 
-  static async deleteItem(collection: keyof DirectusSchema, id: number) {
+  static async deleteItem(collection: keyof DirectusSchema, id: string | number) {
     try {
       await directus.request(
         deleteItem(collection, id)

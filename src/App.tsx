@@ -21,6 +21,11 @@ import {
   AppstoreOutlined,
   BarChartOutlined,
   SettingOutlined,
+  CreditCardOutlined,
+  ShopOutlined,
+  SyncOutlined,
+  DollarOutlined,
+  GiftOutlined,
 } from "@ant-design/icons";
 
 import { authProvider } from "./providers/authProvider";
@@ -35,6 +40,13 @@ import { CallList, CallCreate, CallEdit, CallShow } from "./pages/calls";
 import { TeamList, TeamCreate, TeamEdit, TeamShow } from "./pages/teams";
 import { CampaignList, CampaignCreate, CampaignEdit, CampaignShow } from "./pages/campaigns";
 import { SettingsList } from "./pages/settings";
+
+// Nuevas páginas
+import SubscriptionList from "./pages/subscriptions";
+import TradeInManagement from "./pages/trade-in";
+import StripeConfiguration from "./pages/stripe";
+import ShopifyConfiguration from "./pages/shopify";
+import SyncManagement from "./pages/sync";
 
 function App() {
   return (
@@ -89,6 +101,22 @@ function App() {
                   meta: {
                     label: "Clientes",
                     icon: <TeamOutlined />,
+                  },
+                },
+                {
+                  name: "subscriptions",
+                  list: "/subscriptions",
+                  meta: {
+                    label: "Suscripciones",
+                    icon: <DollarOutlined />,
+                  },
+                },
+                {
+                  name: "trade-in",
+                  list: "/trade-in",
+                  meta: {
+                    label: "Trade-In",
+                    icon: <GiftOutlined />,
                   },
                 },
                 {
@@ -147,6 +175,40 @@ function App() {
                   },
                 },
                 {
+                  name: "stripe",
+                  list: "/stripe",
+                  meta: {
+                    label: "Stripe",
+                    icon: <CreditCardOutlined />,
+                    parent: "integraciones",
+                  },
+                },
+                {
+                  name: "shopify",
+                  list: "/shopify",
+                  meta: {
+                    label: "Shopify",
+                    icon: <ShopOutlined />,
+                    parent: "integraciones",
+                  },
+                },
+                {
+                  name: "sync",
+                  list: "/sync",
+                  meta: {
+                    label: "Sincronización",
+                    icon: <SyncOutlined />,
+                    parent: "integraciones",
+                  },
+                },
+                {
+                  name: "integraciones",
+                  meta: {
+                    label: "Integraciones",
+                    icon: <SettingOutlined />,
+                  },
+                },
+                {
                   name: "settings",
                   list: "/settings",
                   meta: {
@@ -190,6 +252,16 @@ function App() {
                     <Route path="show/:id" element={<CustomerShow />} />
                   </Route>
 
+                  {/* Rutas de Suscripciones */}
+                  <Route path="/subscriptions">
+                    <Route index element={<SubscriptionList />} />
+                  </Route>
+
+                  {/* Rutas de Trade-In */}
+                  <Route path="/trade-in">
+                    <Route index element={<TradeInManagement />} />
+                  </Route>
+
                   {/* Rutas de Productos */}
                   <Route path="/products">
                     <Route index element={<ProductList />} />
@@ -229,6 +301,11 @@ function App() {
                     <Route path="edit/:id" element={<CampaignEdit />} />
                     <Route path="show/:id" element={<CampaignShow />} />
                   </Route>
+
+                  {/* Rutas de Integraciones */}
+                  <Route path="/stripe" element={<StripeConfiguration />} />
+                  <Route path="/shopify" element={<ShopifyConfiguration />} />
+                  <Route path="/sync" element={<SyncManagement />} />
 
                   {/* Configuración */}
                   <Route path="/settings" element={<SettingsList />} />

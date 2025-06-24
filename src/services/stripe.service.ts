@@ -1,56 +1,4 @@
-import DirectusService from './directus.service';
-
-// Interfaces para Stripe
-export interface StripeConfig {
-  id?: number;
-  api_key_test: string;
-  api_key_live: string;
-  webhook_secret_test?: string;
-  webhook_secret_live?: string;
-  mode: 'test' | 'live';
-  is_active: boolean;
-}
-
-export interface StripePaymentLink {
-  id?: number;
-  stripe_payment_link_id: string;
-  plan_type: 'basic' | 'premium' | 'elite';
-  url: string;
-  name: string;
-  description?: string;
-  amount: number;
-  currency: string;
-  is_active: boolean;
-  metadata?: any;
-}
-
-export interface StripeSubscription {
-  id?: number;
-  stripe_subscription_id: string;
-  stripe_customer_id: string;
-  customer_id: number;
-  status: string;
-  current_period_start: string;
-  current_period_end: string;
-  cancel_at_period_end: boolean;
-  canceled_at?: string;
-  plan_id: string;
-  plan_name: string;
-  amount: number;
-  currency: string;
-  interval: string;
-  metadata?: any;
-}
-
-export interface StripeWebhook {
-  id?: number;
-  stripe_event_id: string;
-  type: string;
-  data: any;
-  processed: boolean;
-  error?: string;
-  created_at: string;
-}
+import DirectusService, { StripeConfig, StripePaymentLink, StripeSubscription } from './directus.service';
 
 // Definir los precios de los planes
 export const PLAN_PRICES = {
@@ -85,7 +33,7 @@ export class StripeService {
   static async getConfig(): Promise<StripeConfig | null> {
     try {
       const configs = await DirectusService.getItems<StripeConfig>('stripe_config', {
-        is_active: { _eq: true }
+        active: { _eq: true }
       });
       return configs[0] || null;
     } catch (error) {
@@ -100,14 +48,15 @@ export class StripeService {
       const existingConfigs = await DirectusService.getItems<StripeConfig>('stripe_config');
       for (const existing of existingConfigs) {
         if (existing.id) {
-          await DirectusService.updateItem('stripe_config', existing.id, { is_active: false });
+          await DirectusService.updateItem('stripe_config', existing.id, { active: false });
         }
       }
 
-      // Crear nueva configuración activa
+      // Crear nueva configuración activa con ID único
       const newConfig = await DirectusService.createItem('stripe_config', {
+        id: `stripe_config_${Date.now()}`,
         ...config,
-        is_active: true
+        active: true
       });
       return newConfig;
     } catch (error) {
@@ -120,7 +69,7 @@ export class StripeService {
   static async getPaymentLinks() {
     try {
       const links = await DirectusService.getItems<StripePaymentLink>('stripe_payment_links', {
-        is_active: { _eq: true }
+        status: { _neq: 'deleted' }
       });
       return links;
     } catch (error) {
@@ -133,7 +82,9 @@ export class StripeService {
     try {
       const link = await DirectusService.createItem('stripe_payment_links', {
         ...data,
-        is_active: true
+        status: data.status || 'active',
+        currency: data.currency || 'USD',
+        type: data.type || 'recurring'
       });
       return link;
     } catch (error) {
@@ -142,7 +93,7 @@ export class StripeService {
     }
   }
 
-  static async updatePaymentLink(id: number, data: Partial<StripePaymentLink>) {
+  static async updatePaymentLink(id: string, data: Partial<StripePaymentLink>) {
     try {
       const link = await DirectusService.updateItem('stripe_payment_links', id, data);
       return link;
@@ -152,10 +103,10 @@ export class StripeService {
     }
   }
 
-  static async deletePaymentLink(id: number) {
+  static async deletePaymentLink(id: string) {
     try {
-      // Soft delete - solo desactivar
-      await DirectusService.updateItem('stripe_payment_links', id, { is_active: false });
+      // Soft delete - cambiar estado
+      await DirectusService.updateItem('stripe_payment_links', id, { status: 'deleted' });
       return true;
     } catch (error) {
       console.error('Error deleting payment link:', error);
@@ -174,7 +125,7 @@ export class StripeService {
     }
   }
 
-  static async getSubscriptionsByCustomer(customerId: number) {
+  static async getSubscriptionsByCustomer(customerId: string) {
     try {
       const subscriptions = await DirectusService.getItems<StripeSubscription>('stripe_subscriptions', {
         customer_id: { _eq: customerId }
@@ -197,8 +148,11 @@ export class StripeService {
         // Actualizar
         return await DirectusService.updateItem('stripe_subscriptions', existing[0].id, data);
       } else {
-        // Crear nueva
-        return await DirectusService.createItem('stripe_subscriptions', data);
+        // Crear nueva con ID único
+        return await DirectusService.createItem('stripe_subscriptions', {
+          id: `stripe_sub_${Date.now()}`,
+          ...data
+        });
       }
     } catch (error) {
       console.error('Error creating/updating Stripe subscription:', error);
@@ -223,7 +177,7 @@ export class StripeService {
     }
   }
 
-  static async markWebhookProcessed(id: number, error?: string) {
+  static async markWebhookProcessed(id: string, error?: string) {
     try {
       await DirectusService.updateItem('stripe_webhooks', id, {
         processed: true,
@@ -237,7 +191,7 @@ export class StripeService {
 
   static async getWebhookHistory(limit: number = 50) {
     try {
-      const webhooks = await DirectusService.getItems<StripeWebhook>('stripe_webhooks', {
+      const webhooks = await DirectusService.getItems<any>('stripe_webhooks', {
         _limit: limit,
         _sort: '-created_at'
       });
@@ -294,8 +248,9 @@ export class StripeService {
       // Crear o actualizar cliente
       const customerData = {
         email: session.customer_email,
-        stripe_customer_id: session.customer,
-        name: session.customer_details?.name || session.customer_email
+        first_name: session.customer_details?.name?.split(' ')[0] || session.customer_email,
+        last_name: session.customer_details?.name?.split(' ').slice(1).join(' ') || '',
+        type: 'stripe'
       };
 
       // Buscar cliente existente
@@ -326,19 +281,46 @@ export class StripeService {
 
       // Crear suscripción local
       const subscriptionData = {
-        customer_id: customerId,
-        plan_type: planType,
-        status: 'active' as const,
+        customer_id: customerId.toString(),
+        plan: planType,
+        status: 'active',
         start_date: new Date().toISOString(),
-        stripe_subscription_id: session.subscription,
-        monthly_price: PLAN_PRICES[planType].monthly,
-        included_cleanings: PLAN_PRICES[planType].cleanings,
-        included_inspections: PLAN_PRICES[planType].inspections,
-        has_protection: PLAN_PRICES[planType].protection,
-        has_trade_in: PLAN_PRICES[planType].tradeIn
+        pricing: {
+          amount: PLAN_PRICES[planType].monthly,
+          currency: 'USD',
+          interval: 'monthly'
+        },
+        billing: {
+          method: 'stripe',
+          last_payment: new Date().toISOString()
+        },
+        services: {
+          cleanings: PLAN_PRICES[planType].cleanings,
+          inspections: PLAN_PRICES[planType].inspections,
+          protection: PLAN_PRICES[planType].protection,
+          trade_in: PLAN_PRICES[planType].tradeIn
+        },
+        credits: {
+          cleanings_used: 0,
+          inspections_used: 0
+        }
       };
 
       await DirectusService.createSubscription(subscriptionData);
+
+      // Crear registro en stripe_subscriptions si hay subscription ID
+      if (session.subscription) {
+        await this.createOrUpdateSubscription({
+          stripe_subscription_id: session.subscription,
+          stripe_customer_id: session.customer,
+          customer_id: customerId.toString(),
+          status: 'active',
+          plan_name: planType,
+          amount: PLAN_PRICES[planType].monthly,
+          currency: 'USD',
+          interval: 'monthly'
+        });
+      }
 
     } catch (error) {
       console.error('Error handling checkout completed:', error);
@@ -365,16 +347,7 @@ export class StripeService {
         metadata: subscription.metadata
       });
 
-      // Actualizar suscripción local
-      const localSubscriptions = await DirectusService.getSubscriptions({
-        stripe_subscription_id: { _eq: subscription.id }
-      });
-
-      if (localSubscriptions.length > 0 && localSubscriptions[0].id) {
-        await DirectusService.updateSubscription(localSubscriptions[0].id, {
-          status: subscription.status as any
-        });
-      }
+      // TODO: Actualizar suscripción local si existe mapeo
     } catch (error) {
       console.error('Error handling subscription update:', error);
       throw error;
@@ -383,28 +356,19 @@ export class StripeService {
 
   private static async handleSubscriptionDeleted(subscription: any) {
     try {
-      // Actualizar estado de suscripción local
-      const localSubscriptions = await DirectusService.getSubscriptions({
+      // Actualizar suscripción en stripe_subscriptions
+      const stripeSubscriptions = await this.getSubscriptions({
         stripe_subscription_id: { _eq: subscription.id }
       });
 
-      if (localSubscriptions.length > 0 && localSubscriptions[0].id) {
-        await DirectusService.updateSubscription(localSubscriptions[0].id, {
+      if (stripeSubscriptions.length > 0 && stripeSubscriptions[0].id) {
+        await DirectusService.updateItem('stripe_subscriptions', stripeSubscriptions[0].id, {
           status: 'cancelled',
-          end_date: new Date().toISOString()
+          canceled_at: new Date().toISOString()
         });
       }
 
-      // Actualizar estado del cliente
-      const customers = await DirectusService.getCustomers({
-        stripe_customer_id: { _eq: subscription.customer }
-      });
-
-      if (customers.length > 0 && customers[0].id) {
-        await DirectusService.updateCustomer(customers[0].id, {
-          subscription_status: 'cancelled'
-        });
-      }
+      // TODO: Actualizar suscripción local si existe mapeo
     } catch (error) {
       console.error('Error handling subscription deleted:', error);
       throw error;
@@ -415,7 +379,7 @@ export class StripeService {
     try {
       console.log('Payment succeeded for invoice:', invoice.id);
       // Aquí puedes agregar lógica adicional para pagos exitosos
-      // Por ejemplo, enviar email de confirmación, actualizar créditos, etc.
+      // Por ejemplo, actualizar el billing.last_payment en la suscripción local
     } catch (error) {
       console.error('Error handling payment succeeded:', error);
       throw error;
@@ -426,58 +390,20 @@ export class StripeService {
     try {
       console.log('Payment failed for invoice:', invoice.id);
       
-      // Actualizar estado de suscripción a pausada
-      const localSubscriptions = await DirectusService.getSubscriptions({
+      // Actualizar estado de suscripción si existe
+      const stripeSubscriptions = await this.getSubscriptions({
         stripe_subscription_id: { _eq: invoice.subscription }
       });
 
-      if (localSubscriptions.length > 0 && localSubscriptions[0].id) {
-        await DirectusService.updateSubscription(localSubscriptions[0].id, {
-          status: 'paused'
+      if (stripeSubscriptions.length > 0 && stripeSubscriptions[0].id) {
+        await DirectusService.updateItem('stripe_subscriptions', stripeSubscriptions[0].id, {
+          status: 'past_due'
         });
       }
 
-      // Actualizar estado del cliente
-      const customers = await DirectusService.getCustomers({
-        stripe_customer_id: { _eq: invoice.customer }
-      });
-
-      if (customers.length > 0 && customers[0].id) {
-        await DirectusService.updateCustomer(customers[0].id, {
-          subscription_status: 'paused'
-        });
-      }
+      // TODO: Actualizar suscripción local a estado 'paused' si existe mapeo
     } catch (error) {
       console.error('Error handling payment failed:', error);
-      throw error;
-    }
-  }
-
-  // Métodos de utilidad
-  static async syncSubscriptionStatus(stripeCustomerId: string) {
-    try {
-      // Obtener todas las suscripciones del cliente en Stripe
-      const stripeSubscriptions = await this.getSubscriptions({
-        stripe_customer_id: { _eq: stripeCustomerId }
-      });
-
-      // Determinar el estado general del cliente
-      const hasActiveSubscription = stripeSubscriptions.some(sub => 
-        ['active', 'trialing'].includes(sub.status)
-      );
-
-      // Actualizar estado del cliente
-      const customers = await DirectusService.getCustomers({
-        stripe_customer_id: { _eq: stripeCustomerId }
-      });
-
-      if (customers.length > 0 && customers[0].id) {
-        await DirectusService.updateCustomer(customers[0].id, {
-          subscription_status: hasActiveSubscription ? 'active' : 'inactive'
-        });
-      }
-    } catch (error) {
-      console.error('Error syncing subscription status:', error);
       throw error;
     }
   }
