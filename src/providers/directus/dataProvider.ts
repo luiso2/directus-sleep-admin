@@ -7,10 +7,6 @@ const getToken = () => {
   return localStorage.getItem("directus_access_token");
 };
 
-const isMockToken = (token: string | null) => {
-  return token && token.startsWith("mock-token-");
-};
-
 const fetcher = async (url: string, options: RequestInit = {}) => {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -101,64 +97,9 @@ const getCollectionName = (resource: string): string => {
   return resourceMap[resource] || resource;
 };
 
-// Mock data for demo purposes
-const mockData = {
-  customers: [
-    { id: 1, first_name: "Juan", last_name: "Pérez", email: "juan@example.com", phone: "555-0101", city: "Ciudad de México", type: "individual", vip: false, credit_limit: 10000, created_at: "2024-01-15" },
-    { id: 2, first_name: "María", last_name: "García", email: "maria@example.com", phone: "555-0102", city: "Guadalajara", type: "vip", vip: true, credit_limit: 50000, created_at: "2024-02-20" },
-    { id: 3, first_name: "Empresa ABC", last_name: "", email: "contacto@abc.com", phone: "555-0103", city: "Monterrey", type: "business", vip: false, credit_limit: 100000, created_at: "2024-03-10" },
-  ],
-  products: [
-    { id: 1, name: "Colchón Ortopédico Premium", sku: "COL-001", price: 12000, category: "colchones", status: "active", stock: 25, created_at: "2024-01-01" },
-    { id: 2, name: "Almohada Memory Foam", sku: "ALM-001", price: 800, category: "almohadas", status: "active", stock: 100, created_at: "2024-01-05" },
-    { id: 3, name: "Base Ajustable", sku: "BAS-001", price: 8000, category: "bases", status: "active", stock: 15, created_at: "2024-01-10" },
-  ],
-  sales: [
-    { id: 1, sale_number: "VTA-001", sale_date: "2024-06-20", customer_id: 1, status: "delivered", payment_method: "credit_card", subtotal: 12000, tax: 1920, discount: 0, total: 13920 },
-    { id: 2, sale_number: "VTA-002", sale_date: "2024-06-21", customer_id: 2, status: "confirmed", payment_method: "cash", subtotal: 16000, tax: 2560, discount: 1000, total: 17560 },
-    { id: 3, sale_number: "VTA-003", sale_date: "2024-06-22", customer_id: 3, status: "pending", payment_method: "transfer", subtotal: 20000, tax: 3200, discount: 0, total: 23200 },
-  ],
-  calls: [
-    { id: 1, customer_id: 1, call_date: "2024-06-24", call_type: "follow_up", status: "completed", notes: "Cliente satisfecho con su compra", duration: 15, created_at: "2024-06-24" },
-    { id: 2, customer_id: 2, call_date: "2024-06-24", call_type: "complaint", status: "in_progress", notes: "Problema con la entrega", duration: 25, created_at: "2024-06-24" },
-    { id: 3, customer_id: 3, call_date: "2024-06-24", call_type: "sales", status: "scheduled", notes: "Llamada programada para cerrar venta", duration: 0, created_at: "2024-06-23" },
-  ],
-  teams: [
-    { id: 1, name: "Ventas Norte", manager: "Ana Martinez", members_count: 12, region: "Norte", status: "active", created_at: "2024-01-01" },
-    { id: 2, name: "Ventas Sur", manager: "Carlos Rodriguez", members_count: 8, region: "Sur", status: "active", created_at: "2024-01-01" },
-  ],
-  campaigns: [
-    { id: 1, name: "Verano 2024", type: "seasonal", status: "active", start_date: "2024-06-01", end_date: "2024-08-31", budget: 50000, spent: 25000 },
-    { id: 2, name: "Black Friday", type: "promotional", status: "planned", start_date: "2024-11-25", end_date: "2024-11-30", budget: 100000, spent: 0 },
-  ],
-  directus_users: [
-    { id: 1, email: "lbencomo94@gmail.com", first_name: "Luis", last_name: "Bencomo", status: "active", role: { id: 1, name: "Administrator" } },
-    { id: 2, email: "ana.martinez@sleepplus.com", first_name: "Ana", last_name: "Martinez", status: "active", role: { id: 2, name: "Manager" } },
-    { id: 3, email: "carlos.rodriguez@sleepplus.com", first_name: "Carlos", last_name: "Rodriguez", status: "active", role: { id: 3, name: "Agent" } },
-  ],
-};
-
 export const directusDataProvider: DataProvider = {
   // Get List
   getList: async ({ resource, pagination, filters, sorters }) => {
-    const token = getToken();
-    
-    // Return mock data for demo purposes when using mock token
-    if (isMockToken(token)) {
-      const collection = getCollectionName(resource);
-      const data = mockData[collection as keyof typeof mockData] || [];
-      
-      // Apply pagination
-      const current = pagination?.current || 1;
-      const pageSize = pagination?.pageSize || 10;
-      const start = (current - 1) * pageSize;
-      const end = start + pageSize;
-      
-      return {
-        data: data.slice(start, end),
-        total: data.length,
-      };
-    }
     const collection = getCollectionName(resource);
     const current = pagination?.current || 1;
     const pageSize = pagination?.pageSize || 10;
@@ -232,22 +173,6 @@ export const directusDataProvider: DataProvider = {
 
   // Get One
   getOne: async ({ resource, id }) => {
-    const token = getToken();
-    
-    // Return mock data for demo purposes when using mock token
-    if (isMockToken(token)) {
-      const collection = getCollectionName(resource);
-      const data = mockData[collection as keyof typeof mockData] || [];
-      const item = data.find((item: any) => item.id === Number(id));
-      
-      if (!item) {
-        throw new Error("Item not found");
-      }
-      
-      return {
-        data: item,
-      };
-    }
     const collection = getCollectionName(resource);
     let params = "";
     
@@ -265,20 +190,6 @@ export const directusDataProvider: DataProvider = {
 
   // Create
   create: async ({ resource, variables }) => {
-    const token = getToken();
-    
-    // Return mock response for demo purposes when using mock token
-    if (isMockToken(token)) {
-      const newItem = {
-        id: Date.now(),
-        ...variables,
-        created_at: new Date().toISOString(),
-      };
-      
-      return {
-        data: newItem,
-      };
-    }
     const collection = getCollectionName(resource);
     const { data } = await fetcher(`${API_URL}/items/${collection}`, {
       method: "POST",
@@ -292,19 +203,6 @@ export const directusDataProvider: DataProvider = {
 
   // Update
   update: async ({ resource, id, variables }) => {
-    const token = getToken();
-    
-    // Return mock response for demo purposes when using mock token
-    if (isMockToken(token)) {
-      return {
-        data: {
-          id,
-          ...variables,
-          updated_at: new Date().toISOString(),
-        },
-      };
-    }
-    
     const collection = getCollectionName(resource);
     const { data } = await fetcher(`${API_URL}/items/${collection}/${id}`, {
       method: "PATCH",
@@ -318,15 +216,6 @@ export const directusDataProvider: DataProvider = {
 
   // Delete One
   deleteOne: async <TData extends BaseRecord = BaseRecord>({ resource, id }: DeleteOneParams) => {
-    const token = getToken();
-    
-    // Return mock response for demo purposes when using mock token
-    if (isMockToken(token)) {
-      return {
-        data: { id } as TData,
-      };
-    }
-    
     const collection = getCollectionName(resource);
     await fetcher(`${API_URL}/items/${collection}/${id}`, {
       method: "DELETE",
@@ -339,19 +228,6 @@ export const directusDataProvider: DataProvider = {
 
   // Get Many
   getMany: async ({ resource, ids }) => {
-    const token = getToken();
-    
-    // Return mock data for demo purposes when using mock token
-    if (isMockToken(token)) {
-      const collection = getCollectionName(resource);
-      const data = mockData[collection as keyof typeof mockData] || [];
-      const items = data.filter((item: any) => ids.includes(item.id));
-      
-      return {
-        data: items,
-      };
-    }
-    
     const collection = getCollectionName(resource);
     const params = {
       filter: JSON.stringify({
@@ -369,22 +245,6 @@ export const directusDataProvider: DataProvider = {
 
   // Create Many
   createMany: async ({ resource, variables }) => {
-    const token = getToken();
-    
-    // Return mock response for demo purposes when using mock token
-    if (isMockToken(token)) {
-      const items = Array.isArray(variables) ? variables : [variables];
-      const data = items.map((item, index) => ({
-        id: Date.now() + index,
-        ...item,
-        created_at: new Date().toISOString(),
-      }));
-      
-      return {
-        data,
-      };
-    }
-    
     const collection = getCollectionName(resource);
     const { data } = await fetcher(`${API_URL}/items/${collection}`, {
       method: "POST",
@@ -398,15 +258,6 @@ export const directusDataProvider: DataProvider = {
 
   // Delete Many
   deleteMany: async <TData extends BaseRecord = BaseRecord>({ resource, ids }: DeleteManyParams) => {
-    const token = getToken();
-    
-    // Return mock response for demo purposes when using mock token
-    if (isMockToken(token)) {
-      return {
-        data: ids.map((id) => ({ id } as TData)),
-      };
-    }
-    
     const collection = getCollectionName(resource);
     await fetcher(`${API_URL}/items/${collection}`, {
       method: "DELETE",
@@ -420,21 +271,6 @@ export const directusDataProvider: DataProvider = {
 
   // Update Many
   updateMany: async ({ resource, ids, variables }) => {
-    const token = getToken();
-    
-    // Return mock response for demo purposes when using mock token
-    if (isMockToken(token)) {
-      const data = ids.map((id) => ({
-        id,
-        ...variables,
-        updated_at: new Date().toISOString(),
-      }));
-      
-      return {
-        data,
-      };
-    }
-    
     const collection = getCollectionName(resource);
     const promises = ids.map((id) =>
       fetcher(`${API_URL}/items/${collection}/${id}`, {
@@ -452,14 +288,6 @@ export const directusDataProvider: DataProvider = {
 
   // Custom
   custom: async ({ url, method, filters, sorters, payload, query, headers }) => {
-    const token = getToken();
-    
-    // Return empty response for demo purposes when using mock token
-    if (isMockToken(token)) {
-      return {
-        data: {},
-      };
-    }
     let requestUrl = `${API_URL}${url}`;
 
     // Agregar query params si existen

@@ -70,65 +70,7 @@ export const authProvider: AuthProvider = {
     try {
       console.log('Login attempt with:', email);
       
-      // Temporary mock login for demo purposes
-      // Remove this block when real users are configured in Directus
-      if ((email === 'lbencomo94@gmail.com' || 
-           email === 'ana.martinez@sleepplus.com' || 
-           email === 'carlos.rodriguez@sleepplus.com') && 
-          password === 'admin123') {
-        
-        // Mock user data based on email
-        let mockUser = {
-          id: '1',
-          email: email,
-          first_name: 'Demo',
-          last_name: 'User',
-          role: { name: 'Agent' }
-        };
-        
-        if (email === 'lbencomo94@gmail.com') {
-          mockUser.first_name = 'Luis';
-          mockUser.last_name = 'Bencomo';
-          mockUser.role.name = 'Administrator';
-        } else if (email === 'ana.martinez@sleepplus.com') {
-          mockUser.first_name = 'Ana';
-          mockUser.last_name = 'Martinez';
-          mockUser.role.name = 'Manager';
-        } else if (email === 'carlos.rodriguez@sleepplus.com') {
-          mockUser.first_name = 'Carlos';
-          mockUser.last_name = 'Rodriguez';
-          mockUser.role.name = 'Agent';
-        }
-        
-        // Map role
-        let appRole = "agent";
-        if (mockUser.role.name === "Administrator") {
-          appRole = "admin";
-        } else if (mockUser.role.name === "Manager") {
-          appRole = "manager";
-        }
-        
-        // Store mock auth data
-        const userData = {
-          id: mockUser.id,
-          email: mockUser.email,
-          first_name: mockUser.first_name,
-          last_name: mockUser.last_name,
-          name: `${mockUser.first_name} ${mockUser.last_name}`,
-          role: appRole,
-          avatar: null,
-        };
-        
-        localStorage.setItem("auth", JSON.stringify(userData));
-        localStorage.setItem("directus_access_token", "mock-token-" + Date.now());
-        
-        return {
-          success: true,
-          redirectTo: "/",
-        };
-      }
-      
-      // Try real Directus login
+      // Real Directus login
       const result = await loginToDirectus(email, password);
 
       if (result.access_token) {
