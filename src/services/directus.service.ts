@@ -1,8 +1,18 @@
 import { createDirectus, rest, authentication, createItem, readItems, updateItem, deleteItem } from '@directus/sdk';
 
 // Configuración de Directus
-const DIRECTUS_URL = 'https://admin-api-directus.dqyvuv.easypanel.host';
-const DIRECTUS_TOKEN = 'mcp_414xdh4vq47mcao0jg2';
+// En desarrollo, usa el proxy de Vite. En producción, usa el proxy de Vercel
+const isDevelopment = import.meta.env.DEV;
+const DIRECTUS_URL = isDevelopment 
+  ? window.location.origin + import.meta.env.VITE_DIRECTUS_API_BASE 
+  : window.location.origin + '/api/directus';
+const DIRECTUS_TOKEN = import.meta.env.VITE_DIRECTUS_TOKEN;
+
+console.log('Directus Config:', {
+  isDevelopment,
+  url: DIRECTUS_URL,
+  hasToken: !!DIRECTUS_TOKEN
+});
 
 // Tipos base para las tablas - ACTUALIZADOS según estructura real
 export interface DirectusBaseItem {
@@ -85,18 +95,24 @@ export interface Evaluation extends DirectusBaseItem {
   redeemed_at?: string;
 }
 
+// STRIPE - Interfaces actualizadas según estructura real de BD
 export interface StripeConfig extends DirectusBaseItem {
   id?: string;
   publishable_key?: string;
   secret_key?: string;
   webhook_secret?: string;
+  test_secret_key?: string;
+  test_webhook_secret?: string;
+  live_secret_key?: string;
+  live_webhook_secret?: string;
+  mode?: string; // 'test' | 'live'
   active?: boolean;
 }
 
 export interface StripePaymentLink extends DirectusBaseItem {
-  id?: string;
+  id?: string; // UUID
   stripe_payment_link_id?: string;
-  customer_id?: string;
+  customer_id?: string; // UUID
   customer_email?: string;
   product_name: string;
   description?: string;
@@ -107,71 +123,92 @@ export interface StripePaymentLink extends DirectusBaseItem {
   url?: string;
   metadata?: any;
   settings?: any;
-  created_by?: string;
+  created_by?: string; // UUID
   expires_at?: string;
   completed_at?: string;
 }
 
 export interface StripeSubscription extends DirectusBaseItem {
-  id?: string;
-  customer_id?: string;
-  stripe_subscription_id: string;
-  stripe_customer_id: string;
-  status: string;
+  id?: string; // UUID
+  stripe_subscription_id?: string;
+  customer_id?: string; // UUID
+  stripe_customer_id?: string;
+  stripe_price_id?: string;
+  stripe_product_id?: string;
+  status?: string;
+  plan: string;
+  interval: string;
+  interval_count?: number;
+  amount: number;
+  currency?: string;
   current_period_start?: string;
   current_period_end?: string;
   cancel_at_period_end?: boolean;
   canceled_at?: string;
-  plan_id?: string;
-  plan_name?: string;
-  amount?: number;
-  currency?: string;
-  interval?: string;
+  trial_start?: string;
+  trial_end?: string;
   metadata?: any;
+  created_by?: string; // UUID
 }
 
+// SHOPIFY - Interfaces actualizadas según estructura real de BD
 export interface ShopifySettings extends DirectusBaseItem {
   id?: string;
-  shop_domain?: string;
+  store_name: string;
+  shopify_domain: string;
   api_key?: string;
-  api_secret?: string;
+  api_secret_key?: string;
   access_token?: string;
-  webhook_secret?: string;
-  active?: boolean;
+  webhook_api_version?: string;
+  is_active?: boolean;
   last_sync?: string;
+  sync_settings?: any;
+  shop_domain?: string; // Campo adicional
+  api_secret?: string; // Campo adicional
+  webhook_secret?: string;
+  active?: boolean; // Campo adicional
 }
 
 export interface ShopifyProduct extends DirectusBaseItem {
   id?: string;
-  shopify_product_id: string;
+  shopify_id?: string; // Cambiado de shopify_product_id
   title: string;
-  handle?: string;
-  product_type?: string;
+  body_html?: string;
   vendor?: string;
+  product_type?: string;
   tags?: string;
   status?: string;
   variants?: any;
+  options?: any;
   images?: any;
-  price?: number;
-  compare_at_price?: number;
-  inventory_quantity?: number;
+  image_url?: string;
 }
 
 export interface ShopifyCoupon extends DirectusBaseItem {
   id?: string;
-  shopify_price_rule_id?: string;
-  shopify_discount_code_id?: string;
   code: string;
-  value: number;
-  value_type: string;
-  usage_count?: number;
+  description?: string;
+  discount_type?: string;
+  discount_value?: number;
+  minimum_amount?: number;
   usage_limit?: number;
-  starts_at?: string;
-  ends_at?: string;
+  usage_count?: number;
+  expires_at?: string;
   active?: boolean;
-  customer_id?: string;
-  evaluation_id?: string;
-  created_for?: string;
+}
+
+export interface ShopifyCustomer extends DirectusBaseItem {
+  id?: string;
+  shopify_customer_id?: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  tags?: string;
+  total_spent?: number;
+  orders_count?: number;
+  accepts_marketing?: boolean;
+  marketing_opt_in_level?: string;
 }
 
 // Schema de Directus actualizado
@@ -185,7 +222,7 @@ type DirectusSchema = {
   stripe_webhooks: any[];
   shopify_settings: ShopifySettings[];
   shopify_products: ShopifyProduct[];
-  shopify_customers: any[];
+  shopify_customers: ShopifyCustomer[];
   shopify_coupons: ShopifyCoupon[];
   sync_history: any[];
   entity_mappings: any[];

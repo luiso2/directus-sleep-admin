@@ -91,11 +91,20 @@ export class StripeService {
 
   static async createPaymentLink(data: Partial<StripePaymentLink>) {
     try {
+      // No especificar ID ya que la tabla usa UUID con gen_random_uuid()
       const link = await DirectusService.createItem('stripe_payment_links', {
         ...data,
         status: data.status || 'active',
         currency: data.currency || 'USD',
-        type: data.type || 'recurring'
+        type: data.type || 'recurring',
+        metadata: data.metadata || {},
+        settings: data.settings || {
+          submitType: 'auto',
+          allowPromotionCodes: true,
+          collectCustomerName: false,
+          collectBillingAddress: false
+        },
+        created_at: new Date().toISOString()
       });
       return link;
     } catch (error) {
@@ -106,7 +115,10 @@ export class StripeService {
 
   static async updatePaymentLink(id: string, data: Partial<StripePaymentLink>) {
     try {
-      const link = await DirectusService.updateItem('stripe_payment_links', id, data);
+      const link = await DirectusService.updateItem('stripe_payment_links', id, {
+        ...data,
+        updated_at: new Date().toISOString()
+      });
       return link;
     } catch (error) {
       console.error('Error updating payment link:', error);
@@ -117,7 +129,10 @@ export class StripeService {
   static async deletePaymentLink(id: string) {
     try {
       // Soft delete - cambiar estado
-      await DirectusService.updateItem('stripe_payment_links', id, { status: 'deleted' });
+      await DirectusService.updateItem('stripe_payment_links', id, { 
+        status: 'deleted',
+        updated_at: new Date().toISOString()
+      });
       return true;
     } catch (error) {
       console.error('Error deleting payment link:', error);
@@ -157,12 +172,15 @@ export class StripeService {
 
       if (existing.length > 0 && existing[0].id) {
         // Actualizar
-        return await DirectusService.updateItem('stripe_subscriptions', existing[0].id, data);
+        return await DirectusService.updateItem('stripe_subscriptions', existing[0].id, {
+          ...data,
+          updated_at: new Date().toISOString()
+        });
       } else {
-        // Crear nueva con ID único
+        // Crear nueva (sin especificar ID ya que usa UUID)
         return await DirectusService.createItem('stripe_subscriptions', {
-          id: `stripe_sub_${Date.now()}`,
-          ...data
+          ...data,
+          created_at: new Date().toISOString()
         });
       }
     } catch (error) {
@@ -175,6 +193,7 @@ export class StripeService {
   static async logWebhook(eventData: any) {
     try {
       const webhook = await DirectusService.createItem('stripe_webhooks', {
+        id: `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         stripe_event_id: eventData.id,
         type: eventData.type,
         data: eventData,
@@ -192,7 +211,8 @@ export class StripeService {
     try {
       await DirectusService.updateItem('stripe_webhooks', id, {
         processed: true,
-        error: error || null
+        error: error || null,
+        processed_at: new Date().toISOString()
       });
     } catch (error) {
       console.error('Error marking webhook as processed:', error);
@@ -284,10 +304,25 @@ export class StripeService {
       let planType: 'basic' | 'premium' | 'elite' = 'basic';
       const amount = session.amount_total / 100; // Convertir de centavos
 
-      if (amount >= PLAN_PRICES.elite.monthly || amount >= PLAN_PRICES.elite.yearly) {
-        planType = 'elite';
-      } else if (amount >= PLAN_PRICES.premium.monthly || amount >= PLAN_PRICES.premium.yearly) {
-        planType = 'premium';
+      // Determinar el intervalo (mensual o anual)
+      let interval = 'monthly';
+      if (session.subscription && session.subscription_data) {
+        interval = session.subscription_data.items?.[0]?.price?.recurring?.interval || 'monthly';
+      }
+
+      // Determinar el plan basado en el monto y el intervalo
+      if (interval === 'yearly') {
+        if (amount >= PLAN_PRICES.elite.yearly) {
+          planType = 'elite';
+        } else if (amount >= PLAN_PRICES.premium.yearly) {
+          planType = 'premium';
+        }
+      } else {
+        if (amount >= PLAN_PRICES.elite.monthly) {
+          planType = 'elite';
+        } else if (amount >= PLAN_PRICES.premium.monthly) {
+          planType = 'premium';
+        }
       }
 
       // Crear suscripción local
@@ -297,9 +332,9 @@ export class StripeService {
         status: 'active',
         start_date: new Date().toISOString(),
         pricing: {
-          amount: PLAN_PRICES[planType].monthly,
+          amount: interval === 'yearly' ? PLAN_PRICES[planType].yearly : PLAN_PRICES[planType].monthly,
           currency: 'USD',
-          interval: 'monthly'
+          interval: interval
         },
         billing: {
           method: 'stripe',
@@ -326,10 +361,11 @@ export class StripeService {
           stripe_customer_id: session.customer,
           customer_id: customerId.toString(),
           status: 'active',
-          plan_name: planType,
-          amount: PLAN_PRICES[planType].monthly,
+          plan: planType,
+          amount: interval === 'yearly' ? PLAN_PRICES[planType].yearly : PLAN_PRICES[planType].monthly,
           currency: 'USD',
-          interval: 'monthly'
+          interval: interval,
+          interval_count: 1
         });
       }
 
@@ -341,20 +377,28 @@ export class StripeService {
 
   private static async handleSubscriptionUpdate(subscription: any) {
     try {
+      // Extraer información del plan/precio
+      const priceData = subscription.items.data[0]?.price;
+      const plan = priceData?.nickname || priceData?.product || 'basic';
+      
       // Actualizar suscripción en Stripe
       await this.createOrUpdateSubscription({
         stripe_subscription_id: subscription.id,
         stripe_customer_id: subscription.customer,
+        stripe_price_id: priceData?.id,
+        stripe_product_id: priceData?.product,
         status: subscription.status,
+        plan: plan.toLowerCase(),
+        interval: priceData?.recurring?.interval || 'monthly',
+        interval_count: priceData?.recurring?.interval_count || 1,
+        amount: priceData?.unit_amount ? priceData.unit_amount / 100 : 0,
+        currency: priceData?.currency || 'USD',
         current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
         current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
         cancel_at_period_end: subscription.cancel_at_period_end,
         canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : undefined,
-        plan_id: subscription.items.data[0]?.price.id,
-        plan_name: subscription.items.data[0]?.price.nickname || subscription.items.data[0]?.price.product,
-        amount: subscription.items.data[0]?.price.unit_amount / 100,
-        currency: subscription.items.data[0]?.price.currency,
-        interval: subscription.items.data[0]?.price.recurring?.interval,
+        trial_start: subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : undefined,
+        trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : undefined,
         metadata: subscription.metadata
       });
 
@@ -375,7 +419,8 @@ export class StripeService {
       if (stripeSubscriptions.length > 0 && stripeSubscriptions[0].id) {
         await DirectusService.updateItem('stripe_subscriptions', stripeSubscriptions[0].id, {
           status: 'cancelled',
-          canceled_at: new Date().toISOString()
+          canceled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
       }
 
@@ -389,8 +434,21 @@ export class StripeService {
   private static async handlePaymentSucceeded(invoice: any) {
     try {
       console.log('Payment succeeded for invoice:', invoice.id);
-      // Aquí puedes agregar lógica adicional para pagos exitosos
-      // Por ejemplo, actualizar el billing.last_payment en la suscripción local
+      
+      // Actualizar la fecha del último pago en stripe_subscriptions
+      if (invoice.subscription) {
+        const stripeSubscriptions = await this.getSubscriptions({
+          stripe_subscription_id: { _eq: invoice.subscription }
+        });
+
+        if (stripeSubscriptions.length > 0 && stripeSubscriptions[0].id) {
+          await DirectusService.updateItem('stripe_subscriptions', stripeSubscriptions[0].id, {
+            updated_at: new Date().toISOString()
+          });
+        }
+      }
+      
+      // TODO: Actualizar billing.last_payment en la suscripción local
     } catch (error) {
       console.error('Error handling payment succeeded:', error);
       throw error;
@@ -408,7 +466,8 @@ export class StripeService {
 
       if (stripeSubscriptions.length > 0 && stripeSubscriptions[0].id) {
         await DirectusService.updateItem('stripe_subscriptions', stripeSubscriptions[0].id, {
-          status: 'past_due'
+          status: 'past_due',
+          updated_at: new Date().toISOString()
         });
       }
 
@@ -417,6 +476,23 @@ export class StripeService {
       console.error('Error handling payment failed:', error);
       throw error;
     }
+  }
+
+  // Métodos auxiliares para obtener las claves correctas según el modo
+  static async getActiveSecretKey(config: StripeConfig): Promise<string> {
+    const mode = config.mode || 'test';
+    if (mode === 'live') {
+      return config.live_secret_key || config.secret_key || '';
+    }
+    return config.test_secret_key || config.secret_key || '';
+  }
+
+  static async getActiveWebhookSecret(config: StripeConfig): Promise<string> {
+    const mode = config.mode || 'test';
+    if (mode === 'live') {
+      return config.live_webhook_secret || config.webhook_secret || '';
+    }
+    return config.test_webhook_secret || config.webhook_secret || '';
   }
 }
 
