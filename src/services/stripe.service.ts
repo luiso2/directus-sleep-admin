@@ -44,20 +44,31 @@ export class StripeService {
 
   static async saveConfig(config: Partial<StripeConfig>) {
     try {
-      // Desactivar configuraciones anteriores
-      const existingConfigs = await DirectusService.getItems<StripeConfig>('stripe_config');
-      for (const existing of existingConfigs) {
-        if (existing.id) {
-          await DirectusService.updateItem('stripe_config', existing.id, { active: false });
+      // Intentar desactivar configuraciones anteriores (si tenemos permisos)
+      try {
+        const existingConfigs = await DirectusService.getItems<StripeConfig>('stripe_config', {
+          active: { _eq: true }
+        });
+        
+        // Solo actualizar si encontramos configuraciones activas
+        for (const existing of existingConfigs) {
+          if (existing.id) {
+            await DirectusService.updateItem('stripe_config', existing.id, { active: false });
+          }
         }
+      } catch (error) {
+        // Si no podemos leer las configuraciones existentes, continuamos
+        console.log('Could not read existing config, continuing with creation');
       }
 
       // Crear nueva configuración activa con ID único
       const newConfig = await DirectusService.createItem('stripe_config', {
-        id: `stripe_config_${Date.now()}`,
+        id: `stripe_config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         ...config,
-        active: true
+        active: true,
+        created_at: new Date().toISOString()
       });
+      
       return newConfig;
     } catch (error) {
       console.error('Error saving Stripe config:', error);

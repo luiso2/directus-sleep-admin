@@ -52,13 +52,13 @@ const resourceMap: Record<string, string> = {
   users: "directus_users",
   roles: "directus_roles",
   
-  // Entidades principales del negocio
-  customers: "customers",
-  products: "products",
+  // Entidades principales del negocio - CORREGIDO con nombres reales de las tablas
+  customers: "new_customers",
+  products: "new_products",
+  employees: "new_employees",
   sales: "sales",
   calls: "calls",
   tasks: "calls", // Alias para llamadas/tareas
-  employees: "employees",
   stores: "stores",
   teams: "stores", // Usar stores como teams por ahora
   
@@ -78,7 +78,13 @@ const resourceMap: Record<string, string> = {
   subscriptions: "subscriptions",
   payment_links: "payment_links",
   
-  // Integraciones
+  // Integraciones Stripe
+  stripe_config: "stripe_config",
+  stripe_payment_links: "stripe_payment_links",
+  stripe_subscriptions: "stripe_subscriptions",
+  stripe_webhooks: "stripe_webhooks",
+  
+  // Integraciones Shopify
   shopify_products: "shopify_products",
   shopify_customers: "shopify_customers",
   shopify_coupons: "shopify_coupons",
@@ -91,6 +97,8 @@ const resourceMap: Record<string, string> = {
   system_settings: "system_settings",
   webhooks: "webhooks",
   webhook_events: "webhook_events",
+  sync_history: "sync_history",
+  entity_mappings: "entity_mappings",
 };
 
 const getCollectionName = (resource: string): string => {

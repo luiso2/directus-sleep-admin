@@ -16,20 +16,31 @@ export class ShopifyService {
 
   static async saveSettings(settings: Partial<ShopifySettings>) {
     try {
-      // Desactivar configuraciones anteriores
-      const existingSettings = await DirectusService.getItems<ShopifySettings>('shopify_settings');
-      for (const existing of existingSettings) {
-        if (existing.id) {
-          await DirectusService.updateItem('shopify_settings', existing.id, { active: false });
+      // Intentar desactivar configuraciones anteriores (si tenemos permisos)
+      try {
+        const existingSettings = await DirectusService.getItems<ShopifySettings>('shopify_settings', {
+          active: { _eq: true }
+        });
+        
+        // Solo actualizar si encontramos configuraciones activas
+        for (const existing of existingSettings) {
+          if (existing.id) {
+            await DirectusService.updateItem('shopify_settings', existing.id, { active: false });
+          }
         }
+      } catch (error) {
+        // Si no podemos leer las configuraciones existentes, continuamos
+        console.log('Could not read existing settings, continuing with creation');
       }
 
       // Crear nueva configuración activa con ID único
       const newSettings = await DirectusService.createItem('shopify_settings', {
-        id: `shopify_config_${Date.now()}`,
+        id: `shopify_config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         ...settings,
-        active: true
+        active: true,
+        created_at: new Date().toISOString()
       });
+      
       return newSettings;
     } catch (error) {
       console.error('Error saving Shopify settings:', error);

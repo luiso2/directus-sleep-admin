@@ -201,12 +201,18 @@ export class DirectusService {
   // Métodos para Clientes
   static async getCustomers(filter?: any) {
     try {
+      const params: any = {
+        sort: ['-created_at'],
+        limit: -1
+      };
+      
+      // Solo agregar filter si existe
+      if (filter && Object.keys(filter).length > 0) {
+        params.filter = filter;
+      }
+      
       const customers = await directus.request(
-        readItems('new_customers', {
-          filter,
-          sort: ['-created_at'],
-          limit: -1
-        })
+        readItems('new_customers', params)
       );
       return customers;
     } catch (error) {
@@ -257,12 +263,18 @@ export class DirectusService {
   // Métodos para Suscripciones
   static async getSubscriptions(filter?: any) {
     try {
+      const params: any = {
+        sort: ['-created_at'],
+        limit: -1
+      };
+      
+      // Solo agregar filter si existe
+      if (filter && Object.keys(filter).length > 0) {
+        params.filter = filter;
+      }
+      
       const subscriptions = await directus.request(
-        readItems('subscriptions', {
-          filter,
-          sort: ['-created_at'],
-          limit: -1
-        })
+        readItems('subscriptions', params)
       );
       return subscriptions;
     } catch (error) {
@@ -318,12 +330,18 @@ export class DirectusService {
   // Métodos para Evaluaciones Trade-In
   static async getEvaluations(filter?: any) {
     try {
+      const params: any = {
+        sort: ['-created_at'],
+        limit: -1
+      };
+      
+      // Solo agregar filter si existe
+      if (filter && Object.keys(filter).length > 0) {
+        params.filter = filter;
+      }
+      
       const evaluations = await directus.request(
-        readItems('evaluations', {
-          filter,
-          sort: ['-created_at'],
-          limit: -1
-        })
+        readItems('evaluations', params)
       );
       return evaluations;
     } catch (error) {
@@ -364,12 +382,18 @@ export class DirectusService {
   // Métodos genéricos para otras tablas
   static async getItems<T>(collection: keyof DirectusSchema, filter?: any) {
     try {
+      const params: any = {
+        sort: ['-created_at'],
+        limit: -1
+      };
+      
+      // Solo agregar filter si existe
+      if (filter && Object.keys(filter).length > 0) {
+        params.filter = filter;
+      }
+      
       const items = await directus.request(
-        readItems(collection, {
-          filter,
-          sort: ['-created_at'],
-          limit: -1
-        })
+        readItems(collection, params)
       );
       return items as T[];
     } catch (error) {
