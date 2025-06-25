@@ -1,4 +1,4 @@
-import DirectusService, { ShopifySettings, ShopifyProduct, ShopifyCoupon } from './directus.service';
+import DirectusService, { ShopifySettings, ShopifyProduct, ShopifyCoupon, ShopifyCustomer } from './directus.service';
 import ShopifyAPIClient from './shopify/shopify-api-client';
 
 export class ShopifyService {
@@ -13,10 +13,10 @@ export class ShopifyService {
       }
 
       this.apiClient = new ShopifyAPIClient({
-        shopDomain: settings.shop_domain,
-        apiKey: settings.api_key,
-        apiSecret: settings.api_secret,
-        accessToken: settings.access_token
+        shopDomain: settings.shopify_domain || settings.shop_domain || '',
+        apiKey: settings.api_key || '',
+        apiSecret: settings.api_secret_key || settings.api_secret || '',
+        accessToken: settings.access_token || ''
       });
     }
     return this.apiClient;
@@ -26,6 +26,7 @@ export class ShopifyService {
   private static resetAPIClient() {
     this.apiClient = null;
   }
+  
   // Configuración de Shopify
   static async getSettings(): Promise<ShopifySettings | null> {
     try {
@@ -63,6 +64,7 @@ export class ShopifyService {
         id: `shopify_config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         ...settings,
         active: true,
+        is_active: true,
         created_at: new Date().toISOString()
       });
       
@@ -93,23 +95,22 @@ export class ShopifyService {
       
       for (const product of products) {
         const productData: Partial<ShopifyProduct> = {
-          shopify_product_id: product.id.toString(),
+          shopify_id: product.id.toString(),
           title: product.title,
-          handle: product.handle,
+          body_html: product.body_html,
           product_type: product.product_type,
           vendor: product.vendor,
           tags: product.tags,
           status: product.status,
           variants: product.variants,
+          options: product.options,
           images: product.images,
-          price: product.variants?.[0]?.price ? parseFloat(product.variants[0].price) : 0,
-          compare_at_price: product.variants?.[0]?.compare_at_price ? parseFloat(product.variants[0].compare_at_price) : undefined,
-          inventory_quantity: product.variants?.[0]?.inventory_quantity
+          image_url: product.images?.[0]?.src || null
         };
 
         // Verificar si el producto ya existe
         const existing = await DirectusService.getItems<ShopifyProduct>('shopify_products', {
-          shopify_product_id: { _eq: productData.shopify_product_id }
+          shopify_id: { _eq: productData.shopify_id }
         });
 
         if (existing.length > 0 && existing[0].id) {
@@ -120,7 +121,8 @@ export class ShopifyService {
           // Crear nuevo con ID único
           const created = await DirectusService.createItem('shopify_products', {
             id: `shopify_prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            ...productData
+            ...productData,
+            created_at: new Date().toISOString()
           });
           results.push(created);
         }
@@ -144,7 +146,7 @@ export class ShopifyService {
   // Clientes de Shopify
   static async getCustomers(filter?: any) {
     try {
-      const customers = await DirectusService.getItems<any>('shopify_customers', filter);
+      const customers = await DirectusService.getItems<ShopifyCustomer>('shopify_customers', filter);
       return customers;
     } catch (error) {
       console.error('Error fetching Shopify customers:', error);
@@ -157,7 +159,7 @@ export class ShopifyService {
       const results = [];
       
       for (const customer of customers) {
-        const customerData = {
+        const customerData: Partial<ShopifyCustomer> = {
           shopify_customer_id: customer.id.toString(),
           email: customer.email,
           first_name: customer.first_name,
@@ -173,7 +175,7 @@ export class ShopifyService {
         };
 
         // Verificar si el cliente ya existe
-        const existing = await DirectusService.getItems<any>('shopify_customers', {
+        const existing = await DirectusService.getItems<ShopifyCustomer>('shopify_customers', {
           shopify_customer_id: { _eq: customerData.shopify_customer_id }
         });
 
@@ -182,8 +184,11 @@ export class ShopifyService {
           const updated = await DirectusService.updateItem('shopify_customers', existing[0].id, customerData);
           results.push(updated);
         } else {
-          // Crear nuevo
-          const created = await DirectusService.createItem('shopify_customers', customerData);
+          // Crear nuevo con ID único
+          const created = await DirectusService.createItem('shopify_customers', {
+            id: `shopify_cust_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            ...customerData
+          });
           results.push(created);
         }
 
@@ -198,7 +203,7 @@ export class ShopifyService {
     }
   }
 
-  private static async syncWithLocalCustomer(shopifyCustomer: any) {
+  private static async syncWithLocalCustomer(shopifyCustomer: Partial<ShopifyCustomer>) {
     try {
       // Buscar cliente local por email
       const localCustomers = await DirectusService.getCustomers({
@@ -257,16 +262,14 @@ export class ShopifyService {
       const couponData: Partial<ShopifyCoupon> = {
         id: `coupon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         code: code,
-        value: creditAmount,
-        value_type: 'fixed_amount',
+        discount_value: creditAmount,
+        discount_type: 'fixed_amount',
         usage_count: 0,
         usage_limit: 1,
-        starts_at: new Date().toISOString(),
-        ends_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 días
+        expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 días
         active: true,
-        customer_id: customerId,
-        evaluation_id: evaluationId,
-        created_for: 'trade_in'
+        description: `Trade-In Credit for evaluation ${evaluationId}`,
+        created_at: new Date().toISOString()
       };
 
       const coupon = await DirectusService.createItem('shopify_coupons', couponData);
@@ -275,7 +278,7 @@ export class ShopifyService {
       await DirectusService.updateEvaluation(evaluationId, {
         coupon_code: code,
         status: 'approved',
-        expires_at: couponData.ends_at
+        expires_at: couponData.expires_at
       });
 
       // Llamar a la API de Shopify para crear el Price Rule y Discount Code
@@ -289,23 +292,22 @@ export class ShopifyService {
           {
             usageLimit: 1,
             oncePerCustomer: true,
-            startsAt: couponData.starts_at,
-            endsAt: couponData.ends_at
+            startsAt: new Date().toISOString(),
+            endsAt: couponData.expires_at
           }
         );
 
-        // Actualizar el cupón con los IDs de Shopify
+        // Actualizar el cupón con los IDs de Shopify (si el API devuelve estos campos)
         if (priceRule.id && discountCode.id) {
           await DirectusService.updateItem('shopify_coupons', coupon.id, {
-            shopify_price_rule_id: priceRule.id,
-            shopify_discount_code_id: discountCode.id
+            updated_at: new Date().toISOString()
           });
         }
       } catch (shopifyError) {
         console.error('Error creating coupon in Shopify:', shopifyError);
         // No lanzar error para no interrumpir el flujo, pero registrar el problema
         await DirectusService.updateItem('shopify_coupons', coupon.id, {
-          sync_error: `Failed to create in Shopify: ${shopifyError instanceof Error ? shopifyError.message : 'Unknown error'}`
+          description: couponData.description + ` - Sync Error: ${shopifyError instanceof Error ? shopifyError.message : 'Unknown error'}`
         });
       }
 
@@ -329,12 +331,18 @@ export class ShopifyService {
 
         await DirectusService.updateItem('shopify_coupons', coupon.id, {
           usage_count: newUsageCount,
-          active: isStillActive
+          active: isStillActive,
+          updated_at: new Date().toISOString()
         });
 
         // Si es un cupón de Trade-In y se ha usado, actualizar la evaluación
-        if (coupon.evaluation_id) {
-          await DirectusService.updateEvaluation(coupon.evaluation_id, {
+        // Buscar evaluación por código de cupón
+        const evaluations = await DirectusService.getEvaluations({
+          coupon_code: { _eq: code }
+        });
+
+        if (evaluations.length > 0 && evaluations[0].id) {
+          await DirectusService.updateEvaluation(evaluations[0].id, {
             status: 'redeemed',
             redeemed_at: new Date().toISOString()
           });
@@ -445,6 +453,7 @@ export class ShopifyService {
 
       // Registrar sincronización
       await DirectusService.createItem('sync_history', {
+        id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         service: 'shopify',
         type: 'full_sync',
         status: 'completed',
@@ -459,6 +468,7 @@ export class ShopifyService {
       
       // Registrar error
       await DirectusService.createItem('sync_history', {
+        id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         service: 'shopify',
         type: 'full_sync',
         status: 'failed',

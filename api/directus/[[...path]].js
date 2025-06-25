@@ -13,8 +13,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Eliminar espacios en blanco al final de la URL
+  // Eliminar espacios en blanco al final de la URL y token
   const directusUrl = (process.env.VITE_DIRECTUS_URL || 'https://admin-api-directus.dqyvuv.easypanel.host').trim();
+  const directusToken = (process.env.VITE_DIRECTUS_TOKEN || 'mcp_414xdh4vq47mcao0jg2').trim();
   
   // Extract the path from the query parameters
   const { path } = req.query;
@@ -32,9 +33,9 @@ export default async function handler(req, res) {
     if (req.headers['content-type']) {
       headers['Content-Type'] = req.headers['content-type'];
     }
-    if (req.headers.authorization) {
-      headers['Authorization'] = req.headers.authorization;
-    }
+    
+    // Always add the Directus token
+    headers['Authorization'] = `Bearer ${directusToken}`;
 
     const options = {
       method: req.method,
