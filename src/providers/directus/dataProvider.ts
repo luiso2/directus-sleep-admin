@@ -1,7 +1,10 @@
 import { DataProvider, HttpError, BaseRecord, DeleteOneParams, DeleteManyParams } from "@refinedev/core";
 import queryString from "query-string";
 
-const API_URL = import.meta.env.PROD ? "/api/directus" : import.meta.env.VITE_DIRECTUS_URL;
+// Asegurar que no haya espacios en blanco en la URL
+const API_URL = import.meta.env.PROD 
+  ? "/api/directus" 
+  : (import.meta.env.VITE_DIRECTUS_URL || '').trim();
 
 const getToken = () => {
   return localStorage.getItem("directus_access_token");

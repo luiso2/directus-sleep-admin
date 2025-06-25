@@ -2,8 +2,9 @@ import { DataProvider } from "@refinedev/core";
 import { createDirectus, rest, staticToken } from "@directus/sdk";
 import axios from "axios";
 
-const DIRECTUS_URL = import.meta.env.VITE_DIRECTUS_URL;
-const DIRECTUS_TOKEN = import.meta.env.VITE_DIRECTUS_TOKEN;
+// Eliminar espacios en blanco de las variables de entorno
+const DIRECTUS_URL = (import.meta.env.VITE_DIRECTUS_URL || '').trim();
+const DIRECTUS_TOKEN = (import.meta.env.VITE_DIRECTUS_TOKEN || '').trim();
 
 // Configuración del cliente de Directus
 export const directusClient = createDirectus(DIRECTUS_URL)

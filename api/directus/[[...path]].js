@@ -13,7 +13,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  const directusUrl = process.env.VITE_DIRECTUS_URL || 'https://admin-api-directus.dqyvuv.easypanel.host';
+  // Eliminar espacios en blanco al final de la URL
+  const directusUrl = (process.env.VITE_DIRECTUS_URL || 'https://admin-api-directus.dqyvuv.easypanel.host').trim();
   
   // Extract the path from the query parameters
   const { path } = req.query;
