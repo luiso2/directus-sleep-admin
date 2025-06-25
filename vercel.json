@@ -1,0 +1,24 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "functions": {
+    "api/directus/[[...path]].js": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/directus/:path*",
+      "destination": "/api/directus/[[...path]]"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "VITE_DIRECTUS_URL": "https://admin-api-directus.dqyvuv.easypanel.host",
+    "VITE_DIRECTUS_TOKEN": "mcp_414xdh4vq47mcao0jg2"
+  }
+}
