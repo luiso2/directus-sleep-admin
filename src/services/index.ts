@@ -9,3 +9,6 @@ export * from './directus.service';
 export * from './stripe.service';
 export * from './shopify.service';
 export * from './sync.service';
+
+// Exportar cliente de API de Shopify
+export * from './shopify';

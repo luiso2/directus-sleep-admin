@@ -1,6 +1,31 @@
 import DirectusService, { ShopifySettings, ShopifyProduct, ShopifyCoupon } from './directus.service';
+import ShopifyAPIClient from './shopify/shopify-api-client';
 
 export class ShopifyService {
+  private static apiClient: ShopifyAPIClient | null = null;
+
+  // Obtener cliente de API configurado
+  private static async getAPIClient(): Promise<ShopifyAPIClient> {
+    if (!this.apiClient) {
+      const settings = await this.getSettings();
+      if (!settings) {
+        throw new Error('Shopify settings not configured');
+      }
+
+      this.apiClient = new ShopifyAPIClient({
+        shopDomain: settings.shop_domain,
+        apiKey: settings.api_key,
+        apiSecret: settings.api_secret,
+        accessToken: settings.access_token
+      });
+    }
+    return this.apiClient;
+  }
+
+  // Resetear cliente cuando se actualiza la configuración
+  private static resetAPIClient() {
+    this.apiClient = null;
+  }
   // Configuración de Shopify
   static async getSettings(): Promise<ShopifySettings | null> {
     try {
@@ -40,6 +65,9 @@ export class ShopifyService {
         active: true,
         created_at: new Date().toISOString()
       });
+      
+      // Resetear cliente de API para que use la nueva configuración
+      this.resetAPIClient();
       
       return newSettings;
     } catch (error) {
@@ -250,26 +278,36 @@ export class ShopifyService {
         expires_at: couponData.ends_at
       });
 
-      // TODO: Llamar a la API de Shopify para crear el Price Rule y Discount Code
-      // Este es un placeholder - necesitarás implementar la llamada real a la API de Shopify
-      console.log('TODO: Create coupon in Shopify API', {
-        priceRule: {
-          title: `Trade-In Credit - ${code}`,
-          target_type: 'line_item',
-          target_selection: 'all',
-          allocation_method: 'across',
-          value_type: 'fixed_amount',
-          value: `-${creditAmount}`,
-          customer_selection: 'all',
-          once_per_customer: true,
-          usage_limit: 1,
-          starts_at: couponData.starts_at,
-          ends_at: couponData.ends_at
-        },
-        discountCode: {
-          code: code
+      // Llamar a la API de Shopify para crear el Price Rule y Discount Code
+      try {
+        const apiClient = await this.getAPIClient();
+        const { priceRule, discountCode } = await apiClient.createCoupon(
+          `Trade-In Credit - ${code}`,
+          code,
+          creditAmount,
+          'fixed_amount',
+          {
+            usageLimit: 1,
+            oncePerCustomer: true,
+            startsAt: couponData.starts_at,
+            endsAt: couponData.ends_at
+          }
+        );
+
+        // Actualizar el cupón con los IDs de Shopify
+        if (priceRule.id && discountCode.id) {
+          await DirectusService.updateItem('shopify_coupons', coupon.id, {
+            shopify_price_rule_id: priceRule.id,
+            shopify_discount_code_id: discountCode.id
+          });
         }
-      });
+      } catch (shopifyError) {
+        console.error('Error creating coupon in Shopify:', shopifyError);
+        // No lanzar error para no interrumpir el flujo, pero registrar el problema
+        await DirectusService.updateItem('shopify_coupons', coupon.id, {
+          sync_error: `Failed to create in Shopify: ${shopifyError instanceof Error ? shopifyError.message : 'Unknown error'}`
+        });
+      }
 
       return coupon;
     } catch (error) {
@@ -380,9 +418,30 @@ export class ShopifyService {
         throw new Error('Shopify settings not configured');
       }
 
-      // TODO: Implementar llamadas reales a la API de Shopify
-      // Este es un placeholder
-      console.log('TODO: Implement actual Shopify API calls for sync');
+      // Implementar llamadas reales a la API de Shopify
+      const apiClient = await this.getAPIClient();
+      
+      try {
+        // Sincronizar productos
+        console.log('Fetching products from Shopify...');
+        const products = await apiClient.getProducts();
+        const syncedProducts = await this.syncProducts(products);
+        results.products = syncedProducts.length;
+      } catch (error) {
+        console.error('Error syncing products:', error);
+        results.errors.push(`Products sync error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+
+      try {
+        // Sincronizar clientes
+        console.log('Fetching customers from Shopify...');
+        const customers = await apiClient.getCustomers();
+        const syncedCustomers = await this.syncCustomers(customers);
+        results.customers = syncedCustomers.length;
+      } catch (error) {
+        console.error('Error syncing customers:', error);
+        results.errors.push(`Customers sync error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
 
       // Registrar sincronización
       await DirectusService.createItem('sync_history', {

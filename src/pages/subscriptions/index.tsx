@@ -18,7 +18,8 @@ import {
   Statistic,
   Badge,
   Input,
-  Descriptions
+  Descriptions,
+  Typography
 } from 'antd';
 import {
   PlusOutlined,
@@ -36,6 +37,7 @@ import dayjs from 'dayjs';
 import { DirectusService, StripeService, Subscription, NewCustomer, PLAN_PRICES } from '../../services';
 
 const { Option } = Select;
+const { Text } = Typography;
 
 const SubscriptionList: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -532,9 +534,5 @@ const SubscriptionList: React.FC = () => {
     </div>
   );
 };
-
-// Importar Text que faltaba
-import { Typography } from 'antd';
-const { Text } = Typography;
 
 export default SubscriptionList;
