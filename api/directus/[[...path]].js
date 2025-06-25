@@ -14,6 +14,7 @@ export default async function handler(req, res) {
   }
 
   const directusUrl = process.env.VITE_DIRECTUS_URL || 'https://admin-api-directus.dqyvuv.easypanel.host';
+  const directusToken = process.env.VITE_DIRECTUS_TOKEN || 'mcp_414xdh4vq47mcao0jg2';
   
   // Extract the path from the query parameters
   const { path } = req.query;
@@ -31,9 +32,9 @@ export default async function handler(req, res) {
     if (req.headers['content-type']) {
       headers['Content-Type'] = req.headers['content-type'];
     }
-    if (req.headers.authorization) {
-      headers['Authorization'] = req.headers.authorization;
-    }
+    
+    // Always add the Directus token
+    headers['Authorization'] = `Bearer ${directusToken}`;
 
     const options = {
       method: req.method,
