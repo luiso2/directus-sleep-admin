@@ -360,22 +360,22 @@ const ShopifyConfiguration: React.FC = () => {
                 <Col span={12}>
                   <Form.Item
                     name="api_key"
-                    label="API Key"
-                    rules={[{ required: true, message: 'Por favor ingrese la API Key' }]}
+                    label="API Key (opcional)"
+                    rules={[{ required: false }]}
                   >
                     <Input.Password
-                      placeholder="API Key de la aplicación"
+                      placeholder="API Key de la aplicación (solo si usa OAuth)"
                     />
                   </Form.Item>
                 </Col>
                 <Col span={12}>
                   <Form.Item
                     name="api_secret"
-                    label="API Secret"
-                    rules={[{ required: true, message: 'Por favor ingrese el API Secret' }]}
+                    label="API Secret (opcional)"
+                    rules={[{ required: false }]}
                   >
                     <Input.Password
-                      placeholder="API Secret de la aplicación"
+                      placeholder="API Secret de la aplicación (solo si usa OAuth)"
                     />
                   </Form.Item>
                 </Col>
